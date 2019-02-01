@@ -17,7 +17,54 @@ pub trait PointWiseRep: Clone + Add + Neg + Mul { }
 
 /************************** IMPLEMENTATIONS ***********************/
 
-impl<P> From<(P, P)> for Points<P> { fn from( (degree, y): (P, P) ) -> Self { Self { degree , y } } }
+impl<P> PointRep<P> for Points<P> 
+where 
+    P: Add<P, Output=P> + Neg<Output=P> + Mul<P, Output=P> + Copy
+{
+    fn degree(self) -> P {
+        self.degree
+    }
+    fn y(self) -> P {
+        self.y
+    }
+ }
+
+impl<P> From<(P, P)> for Points<P> 
+{ 
+    fn from( (degree, y): (P, P) ) -> Self { 
+        Self { degree , y } 
+    } 
+}
+
+impl<P> Add<Self> for Points<P> 
+where 
+    P: Add<Output=P>
+{ 
+    type Output=Self;
+    fn add(self, rhs: Self) -> Self { 
+        Self::from( (self.degree, self.y + rhs.y) ) 
+    } 
+}
+
+impl<P> Neg for Points<P> 
+where
+    P: Neg<Output=P>
+{ 
+    type Output=Self;
+    fn neg(self) -> Self { 
+        Self::from( (self.degree, -self.y) ) 
+    } 
+}
+
+impl<P> Mul<Self> for Points<P> 
+where
+    P: Mul<Output=P>
+{
+    type Output=Self;
+    fn mul(self, rhs: Self) -> Self { 
+        Self::from( (self.degree, self.y * rhs.y) ) 
+    } 
+}
 
 impl<P> From<Vec<(P, P)>> for PointWise<P> {
     fn from(object: Vec<(P, P)>) -> Self {
@@ -30,7 +77,8 @@ impl<P> From<Vec<(P, P)>> for PointWise<P> {
     }
 }
 
-impl<P> Add<Self> for PointWise<P> where 
+impl<P> Add<Self> for PointWise<P> 
+where 
     P: Add<P, Output=P>
 {
     type Output = Self;    
@@ -45,7 +93,8 @@ impl<P> Add<Self> for PointWise<P> where
     }
 }       
 
-impl<P> Neg for PointWise<P> where 
+impl<P> Neg for PointWise<P> 
+where 
     P: Neg<Output=P>
 {
     type Output=Self;
@@ -59,7 +108,8 @@ impl<P> Neg for PointWise<P> where
     }
 }
 
-impl<P> Mul<Self> for PointWise<P> where 
+impl<P> Mul<Self> for PointWise<P> 
+where 
     P: Mul<P, Output=P>
     + Neg<Output=P>
     + Clone
