@@ -1,4 +1,5 @@
 use std::ops::{Add, Mul, Neg};
+use zksnark::{CoefficientPoly, field::Field};
 
 /************************** TRAIT INTERFACE ***********************/
 
@@ -27,7 +28,7 @@ where
     fn y(self) -> P {
         self.y
     }
- }
+}
 
 impl<P> From<(P, P)> for Points<P> 
 { 
@@ -126,9 +127,72 @@ where
     }
 }
 
+pub mod fft_subroutines {
+
+    use std::ops::*;
+    use zksnark::{field::Field, CoefficientPoly};
+    use num::Complex;
+
+    pub fn filter<T>(object: Vec<T>) -> (Vec<T>, Vec<T>)
+    {
+        use num::Integer;
+
+        let n = object.len()/2;
+        let mut Ax: Vec<T> = Vec::with_capacity(n);
+        let mut Bx: Vec<T> = Vec::with_capacity(n);
+        for (i, val) in object.into_iter().enumerate() {
+            match i.is_even() {
+                true => Ax.push(val),
+                false => Bx.push(val),
+            }
+        }
+        (Ax, Bx)
+    }
+
+    pub fn check_pow<T>(n: T) -> bool
+    where
+        T: Field 
+        + BitAnd<T, Output=T>
+        + Sub<T, Output=T>,
+        <T as BitAnd>::Output: PartialEq<T>
+        + Copy,
+    {
+        n&(n-T::one()) == T::zero()
+    }
+
+    pub fn unity_roots() -> Complex<f32>
+    {
+        let i: Complex<f32> = Complex::i();
+        let radians: Complex<f32> = Complex::from(std::f32::consts::PI) * Complex::from(2 as f32);
+        let e: Complex<f32> = Complex::exp( &(radians * i) );
+        e
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use super::PointWise;
+    use crate::poly_rep::{*, fft_subroutines};
+    use zksnark::field::z251::Z251;
+
+    #[test]
+    fn unity_roots () {
+        assert_eq!(fft_subroutines::unity_roots().re as usize, 1);
+    }
+
+    #[test]
+    fn check_pow_fft() {
+        assert!(fft_subroutines::check_pow( Z251::from(8) ));
+        assert!(!fft_subroutines::check_pow( Z251::from(5) ));
+    }
+
+    #[test]
+    fn filter_fft() {
+        let (Ax, Bx) = fft_subroutines::filter( vec![1, 2, 3, 4] );
+        assert_eq!(Ax, vec![1, 3]);
+        assert_eq!(Bx, vec![2, 4]); 
+        assert!(Ax != vec![2, 4]);
+        assert!(Bx != vec![1, 3]);
+    }
     
     #[test]
     fn pointwise_addition() {
