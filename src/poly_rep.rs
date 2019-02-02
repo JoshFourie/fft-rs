@@ -130,13 +130,11 @@ where
 pub mod fft_subroutines {
 
     use std::ops::*;
-    use zksnark::{field::Field, CoefficientPoly};
-    use num::Complex;
+    use zksnark::field::Field;
+    use num::{Complex, Integer};
 
     pub fn filter<T>(object: Vec<T>) -> (Vec<T>, Vec<T>)
     {
-        use num::Integer;
-
         let n = object.len()/2;
         let mut Ax: Vec<T> = Vec::with_capacity(n);
         let mut Bx: Vec<T> = Vec::with_capacity(n);
@@ -160,23 +158,65 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn unity_roots() -> Complex<f32>
+    pub fn unity_roots<T>(object: Vec<T>) -> Vec<Complex<f64>>
     {
-        let i: Complex<f32> = Complex::i();
-        let radians: Complex<f32> = Complex::from(std::f32::consts::PI) * Complex::from(2 as f32);
-        let e: Complex<f32> = Complex::exp( &(radians * i) );
-        e
+        let de_moivre = |k, n| -> Complex<f64> {
+            Complex::exp( &([
+                Complex::from(2.0), 
+                Complex::from(std::f64::consts::PI), 
+                Complex::i(),
+                Complex::from(k),
+            ].iter()
+                .product::<Complex<f64>>()
+                .div( Complex::from(n as f64) ))
+            )
+            // ENFORCE LEMMA CHECKS
+        };
+        let n = object.len();
+        object.into_iter()
+            .enumerate()
+            .map( |(k, _)| de_moivre(k as f64, n) )
+            .collect::<Vec<Complex<f64>>>()           
     }
 }
 
 #[cfg(test)]
 mod test {
     use crate::poly_rep::{*, fft_subroutines};
-    use zksnark::field::z251::Z251;
+    use zksnark::{field::z251::Z251};
+    use num::Complex;
 
     #[test]
-    fn unity_roots () {
-        assert_eq!(fft_subroutines::unity_roots().re as usize, 1);
+    fn unity_roots_fft () {
+        assert_eq!(
+            fft_subroutines::unity_roots(vec![0, 1, 2, 3])
+                .into_iter()
+                .map( |k| (k.re as isize, k.im as isize ))
+                .collect::<Vec<(isize, isize)>>(),
+            vec![
+                Complex::<isize>::from(1), 
+                Complex::i(),
+                Complex::from(-1), 
+                -Complex::i()
+            ].into_iter()
+                .map(|k| (k.re as isize, k.im as isize ))
+                .collect::<Vec<(isize, isize)>>()
+        );
+        assert_eq!(
+            fft_subroutines::unity_roots(vec![0, 1, 2, 3, 4])
+                .into_iter()
+                .map( |k| (k.re as isize, k.im as isize ))
+                .collect::<Vec<(isize, isize)>>(),
+            vec![
+                Complex::from(1_f32), 
+                Complex::new(0.3090_f32, 0.95106_f32),
+                Complex::new(-0.8090_f32, 0.5878_f32), 
+                Complex::new(-0.8090_f32, -0.5878_f32),
+                Complex::new(0.3090_f32, -0.95106_f32)
+            ].into_iter()
+                .map(|k| (k.re as isize, k.im as isize ))
+                .collect::<Vec<(isize, isize)>>()
+        );
     }
 
     #[test]
