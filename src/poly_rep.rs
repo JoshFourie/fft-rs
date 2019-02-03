@@ -131,7 +131,7 @@ pub mod fft_subroutines {
 
     use std::ops::*;
     use zksnark::field::Field;
-    use num::{Complex, Num, Integer};
+    use num::{Complex, Num, Float, Integer};
 
     pub fn filter<T>(object: Vec<T>) -> (Vec<T>, Vec<T>)
     {
@@ -179,13 +179,14 @@ pub mod fft_subroutines {
             .map( |(k, _)| de_moivre(k as f64, n as f64) )
             .collect::<Vec<Complex<f64>>>()           
     }
-    pub fn discrete_fourier<T>(object: Vec<T>) -> Vec<(usize, Complex<T>)>
-    where 
-        T: Copy + Mul<Complex<f64>, Output=T> + Num
+
+    pub fn discrete_fourier(object: Vec<f64>) -> Vec<(f64, f64)>
     {
-        let N = object.len();
+        let N = object.len() as f64;
         object.into_iter()
-            .map(|)
+            .enumerate()
+            .map(|(k, coeff)| return (k as f64, (1_f64.div(N.sqrt()) * coeff * de_moivre(k as f64, N).re)) )
+            .collect::<Vec<_>>()
     }
 }
 
@@ -197,7 +198,8 @@ mod test {
 
     #[test]
     fn discrete_fourier_fft() {
-
+        let v: Vec<f64> = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+        println!("{:?}", fft_subroutines::discrete_fourier(v));
     }
 
     #[test]
