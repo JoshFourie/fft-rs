@@ -130,8 +130,8 @@ where
 pub mod fft_subroutines {
 
     use std::ops::*;
-    use zksnark::field::Field;
-    use num::{Complex, Num, Float, Integer};
+    use zksnark::{*, field::Field};
+    use num::{Complex, Integer};
 
     pub fn filter<T>(object: Vec<T>) -> (Vec<T>, Vec<T>)
     {
@@ -167,25 +167,24 @@ pub mod fft_subroutines {
                 Complex::from(k),
             ].iter()
                 .product::<Complex<f64>>()
-                .div( N ))
+                .div( Complex::from(N) ))
             )
     }
 
-    pub fn unity_roots<T>(object: Vec<T>) -> Vec<Complex<f64>>
+    pub fn unity_roots<T>(object: &[T]) -> Vec<Complex<f64>>
     {
-        let n = object.len();
         object.into_iter()
             .enumerate()
-            .map( |(k, _)| de_moivre(k as f64, n as f64) )
+            .map( |(k, _)| de_moivre(k as f64, object.len() as f64) )
             .collect::<Vec<Complex<f64>>>()           
     }
 
-    pub fn discrete_fourier(object: Vec<f64>) -> Vec<(f64, f64)>
+    pub fn fast_fourier(object: Vec<f64>) -> Vec<f64>
     {
         let N = object.len() as f64;
         object.into_iter()
             .enumerate()
-            .map(|(k, coeff)| return (k as f64, (1_f64.div(N.sqrt()) * coeff * de_moivre(k as f64, N).re)) )
+            .map(|(k, coeffs)| { 1_f64.div(N.sqrt()) * coeffs * de_moivre( k as f64, N).re })
             .collect::<Vec<_>>()
     }
 }
@@ -198,14 +197,14 @@ mod test {
 
     #[test]
     fn discrete_fourier_fft() {
-        let v: Vec<f64> = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        println!("{:?}", fft_subroutines::discrete_fourier(v));
+        let v = vec![0.0, 2.0];
+        println!("{:?}", fft_subroutines::fast_fourier(v));
     }
 
     #[test]
     fn unity_roots_fft () {
         assert_eq!(
-            fft_subroutines::unity_roots(vec![0, 1, 2, 3])
+            fft_subroutines::unity_roots(&[0, 1, 2, 3])
                 .into_iter()
                 .map( |k| (k.re as isize, k.im as isize ))
                 .collect::<Vec<(isize, isize)>>(),
@@ -219,7 +218,7 @@ mod test {
                 .collect::<Vec<(isize, isize)>>()
         );
         assert_eq!(
-            fft_subroutines::unity_roots(vec![0, 1, 2, 3, 4])
+            fft_subroutines::unity_roots(&[0, 1, 2, 3, 4])
                 .into_iter()
                 .map( |k| (k.re as isize, k.im as isize ))
                 .collect::<Vec<(isize, isize)>>(),
