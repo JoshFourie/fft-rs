@@ -131,7 +131,7 @@ pub mod fft_subroutines {
 
     use std::ops::*;
     use zksnark::field::Field;
-    use num::{Complex, Integer};
+    use num::{Complex, Num, Integer};
 
     pub fn filter<T>(object: Vec<T>) -> (Vec<T>, Vec<T>)
     {
@@ -158,25 +158,34 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn unity_roots<T>(object: Vec<T>) -> Vec<Complex<f64>>
+    pub fn de_moivre(k: f64, N: f64) -> Complex<f64>
     {
-        let de_moivre = |k, n| -> Complex<f64> {
-            Complex::exp( &([
+        Complex::exp( &([
                 Complex::from(2.0), 
                 Complex::from(std::f64::consts::PI), 
                 Complex::i(),
                 Complex::from(k),
             ].iter()
                 .product::<Complex<f64>>()
-                .div( Complex::from(n as f64) ))
+                .div( N ))
             )
-            // ENFORCE LEMMA CHECKS
-        };
+    }
+
+    pub fn unity_roots<T>(object: Vec<T>) -> Vec<Complex<f64>>
+    {
         let n = object.len();
         object.into_iter()
             .enumerate()
-            .map( |(k, _)| de_moivre(k as f64, n) )
+            .map( |(k, _)| de_moivre(k as f64, n as f64) )
             .collect::<Vec<Complex<f64>>>()           
+    }
+    pub fn discrete_fourier<T>(object: Vec<T>) -> Vec<(usize, Complex<T>)>
+    where 
+        T: Copy + Mul<Complex<f64>, Output=T> + Num
+    {
+        let N = object.len();
+        object.into_iter()
+            .map(|)
     }
 }
 
@@ -185,6 +194,11 @@ mod test {
     use crate::poly_rep::{*, fft_subroutines};
     use zksnark::{field::z251::Z251};
     use num::Complex;
+
+    #[test]
+    fn discrete_fourier_fft() {
+
+    }
 
     #[test]
     fn unity_roots_fft () {
