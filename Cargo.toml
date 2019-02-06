@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 zksnark = {git = "https://github.com/JoshFourie/zksnark-rs"}
 num = "0.2"
+itertools = "0.6.0"

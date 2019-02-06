@@ -158,34 +158,44 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn de_moivre(k: f64, N: f64) -> Complex<f64>
+    pub fn de_moivre(j: usize, k: usize, N: f64) -> Complex<f64>
     {
+
         Complex::exp( &([
-                Complex::from(-2.0), 
+                Complex::from(2.0), 
                 Complex::from(std::f64::consts::PI), 
                 Complex::i(),
-                Complex::from(k),
+                Complex::from(j as f64),
+                Complex::from(k as f64)
             ].iter()
                 .product::<Complex<f64>>()
                 .div( Complex::from(N) ))
             )
     }
 
-    pub fn unity_roots<T>(object: &[T]) -> Vec<Complex<f64>>
+    pub fn unity_roots<T>(object: &[T], j: usize) -> Vec<Complex<f64>>
     {
         object.into_iter()
             .enumerate()
-            .map( |(k, _)| de_moivre(k as f64, object.len() as f64) )
+            .map( |(k, _)| de_moivre(j, k, object.len() as f64) )
             .collect::<Vec<Complex<f64>>>()           
     }
 
-    pub fn fast_fourier(object: Vec<f64>) -> Vec<(f64, f64)>
+    pub fn fast_fourier(object: Vec<Complex<f64>>) -> Vec<(Complex<f64>)>
     {
         let N = object.len() as f64;    
-        object.into_iter()
-            .enumerate()
-            .map(|(k, coeffs)| { (k as f64, ( 1_f64.div(N.sqrt()) ) * coeffs * de_moivre( k as f64, N).re) })
-            .collect::<Vec<_>>()
+        object.iter() 
+            .enumerate() // lets us index the object.
+            .map(|(j, coeffs)| 
+            {
+                let mut fourier_series = Vec::new();
+                for k in 0..(N-1_f64) as usize
+                {
+                    fourier_series.push( coeffs * de_moivre(j, k, N) )
+                }
+                fourier_series.into_iter().sum()
+            }
+            ).collect::<Vec<_>>()
     }
 }
 
@@ -195,43 +205,37 @@ mod test {
     use zksnark::{field::z251::Z251};
     use num::Complex;
 
+    pub trait RoundTo { fn round_to(self, x: Self) -> Self; }
+
+    impl RoundTo for f32 { fn round_to(self, x: Self) -> Self { (self * x).round()/x } }
+
+
     #[test]
     fn discrete_fourier_fft() {
-        let v = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-        println!("{:?}", fft_subroutines::fast_fourier(v));
+        let v = vec![
+            Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), Complex::from(-1_f64) + 2_f64 * Complex::i()
+        ];
+        assert_eq!(fft_subroutines::fast_fourier(v), vec![
+            Complex::from(2_f64), -Complex::from(2_f64) - Complex::i(), -2_f64 * Complex::i(), Complex::from(4_f64) + 4_f64 * Complex::i()
+        ]);
     }
 
     #[test]
     fn unity_roots_fft () {
         assert_eq!(
-            fft_subroutines::unity_roots(&[0, 1, 2, 3, 4])
+            fft_subroutines::unity_roots(&[0, 1, 2, 3, 4], 1)
                 .into_iter()
-                .map( |k| (k.re as isize, k.im as isize ))
-                .collect::<Vec<(isize, isize)>>(),
+                .map( |k| ( (k.re as f32).round_to(1000_f32), (k.im as f32).round_to(10000_f32) ))
+                .collect::<Vec<_>>(),
             vec![
                 Complex::from(1_f32), 
-                Complex::new(0.3090_f32, 0.95106_f32),
+                Complex::new(0.3090_f32, 0.9511_f32),
                 Complex::new(-0.8090_f32, 0.5878_f32), 
                 Complex::new(-0.8090_f32, -0.5878_f32),
-                Complex::new(0.3090_f32, -0.95106_f32)
-            ].into_iter()
-                .map(|k| (k.re as isize, k.im as isize ))
-                .collect::<Vec<(isize, isize)>>()
-        );
-        assert_eq!(
-            fft_subroutines::unity_roots(&[0, 1, 0, 0, 0, 0, 0, 0])
-                .into_iter()
-                .map( |k| (k.re as f32, k.im as f32))
-                .collect::<Vec<(f32, f32)>>(),
-            vec![
-                Complex::from(1_f32), 
-                Complex::new(0.3090_f32, 0.95106_f32),
-                Complex::new(-0.8090_f32, 0.5878_f32), 
-                Complex::new(-0.8090_f32, -0.5878_f32),
-                Complex::new(0.3090_f32, -0.95106_f32)
+                Complex::new(0.3090_f32, -0.9511_f32)
             ].into_iter()
                 .map(|k| (k.re, k.im))
-                .collect::<Vec<(f32, f32)>>()
+                .collect::<Vec<_>>()
         );
     }
 
