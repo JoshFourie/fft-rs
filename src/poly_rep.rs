@@ -218,6 +218,21 @@ mod test {
                 .map(|k| (k.re as isize, k.im as isize ))
                 .collect::<Vec<(isize, isize)>>()
         );
+        assert_eq!(
+            fft_subroutines::unity_roots(&[0, 1, 0, 0, 0, 0, 0, 0])
+                .into_iter()
+                .map( |k| (k.re as f32, k.im as f32))
+                .collect::<Vec<(f32, f32)>>(),
+            vec![
+                Complex::from(1_f32), 
+                Complex::new(0.3090_f32, 0.95106_f32),
+                Complex::new(-0.8090_f32, 0.5878_f32), 
+                Complex::new(-0.8090_f32, -0.5878_f32),
+                Complex::new(0.3090_f32, -0.95106_f32)
+            ].into_iter()
+                .map(|k| (k.re, k.im))
+                .collect::<Vec<(f32, f32)>>()
+        );
     }
 
     #[test]
