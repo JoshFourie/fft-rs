@@ -158,7 +158,22 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-
+    pub fn de_moivre(coeffs: Vec<Complex<f32>>, k:f32, N: f32) -> Complex<f32>
+    {
+        let mut sum = Vec::new();
+        for n in 0..N as usize
+        {
+            sum.push(
+                [-2.0, 3.14159, -1.0_f32.sqrt(), k, n as f32, 1.0.div(N)]
+                    .iter()
+                    .map( |val| Complex::<f32>::from( val ))
+                    .product::<Complex<f32>>()        
+                    .exp()
+            )
+        }
+        sum.iter().zip(coeffs).map( |(x, ohm)| x * ohm ).sum()
+    }
+}
 
 
 #[cfg(test)]
@@ -171,40 +186,12 @@ mod test {
 
     impl RoundTo for f32 { fn round_to(self, x: Self) -> Self { (self * x).round()/x } }
 
-
     #[test]
-    fn discrete_fourier_fft() {
-        let v = vec![
-            Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), Complex::from(-1_f64) + 2_f64 * Complex::i()
-        ];
-        assert_eq!(fft_subroutines::fast_fourier(v), vec![
-            Complex::from(2_f64), -Complex::from(2_f64) - Complex::i(), -2_f64 * Complex::i(), Complex::from(4_f64) + 4_f64 * Complex::i()
-        ]);
-        let w = vec![
-            Complex::from(0_f64), Complex::from(1_f64), Complex::from(0_f64), Complex::from(0_f64)
-        ];
-        assert_eq!(fft_subroutines::fast_fourier(w), vec![
-            Complex::from(2_f64), -Complex::from(2_f64) - Complex::i(), -2_f64 * Complex::i(), Complex::from(4_f64) + 4_f64 * Complex::i()
-        ]);
-    }
-
-    #[test]
-    fn unity_roots_fft () {
-        assert_eq!(
-            fft_subroutines::unity_roots(&[0, 1, 2, 3, 4], 1)
-                .into_iter()
-                .map( |k| ( (k.re as f32).round_to(1000_f32), (k.im as f32).round_to(10000_f32) ))
-                .collect::<Vec<_>>(),
-            vec![
-                Complex::from(1_f32), 
-                Complex::new(0.3090_f32, 0.9511_f32),
-                Complex::new(-0.8090_f32, 0.5878_f32), 
-                Complex::new(-0.8090_f32, -0.5878_f32),
-                Complex::new(0.3090_f32, -0.9511_f32)
-            ].into_iter()
-                .map(|k| (k.re, k.im))
-                .collect::<Vec<_>>()
-        );
+    fn de_moivre_fft() {
+        let coeffs = vec![ Complex::from(2_f32), -Complex::from(2_f32) - Complex::i(), -2_f32 * Complex::i(), Complex::from(4_f32) + 4_f32 * Complex::i()];
+        assert_eq!( 
+            fft_subroutines::de_moivre(coeffs, 1_f32, 4_f32), 
+            Complex::from(-2_f32) - 2.0_f32*Complex::i() );
     }
 
     #[test]
