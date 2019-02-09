@@ -158,14 +158,14 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn de_moivre(coeffs: Vec<Complex<f32>>, k:f32, N: f32) -> Complex<f32>
+    pub fn single_dft(coeffs: Vec<Complex<f32>>, k:f32) -> Complex<f32>
     {
         let mut sum: Vec<Complex<f32>> = Vec::new();
-        for n in 0..N as usize
+        for n in 0..coeffs.len() as usize
         {
             sum.push((
                 Complex::from(
-                    [-2.0, 3.141592653589793, k, n as f32, 1.0.div(N)]
+                    [-2.0, 3.141592653589793, k, n as f32, 1.0.div( coeffs.len() as f32 )]
                         .iter()
                         .product::<f32>()
                 ) * Complex::i()
@@ -174,6 +174,7 @@ pub mod fft_subroutines {
         }
         sum.iter().zip(coeffs).map( |(x, ohm)| x * ohm ).sum()
     }
+    pub fn seq_dft(coeffs: Vec<Complex<f32>>) {}
 }
 
 
@@ -188,11 +189,10 @@ mod test {
     impl RoundTo for f32 { fn round_to(self, x: Self) -> Self { (self * x).round()/x } }
 
     #[test]
-    fn de_moivre_fft() {
+    fn de_moivre_dft() {
         let coeffs = vec![ Complex::from(1_f32), Complex::from(2_f32) - Complex::i(), -Complex::i(), -Complex::from(1_f32) + 2_f32 * Complex::i()];
-        assert_eq!( 
-            fft_subroutines::de_moivre(coeffs, 1_f32, 4_f32), 
-            Complex::from(-2_f32) - 2.0_f32*Complex::i() );
+        assert!( fft_subroutines::single_dft(coeffs.clone(), 1_f32) == Complex::from(-2_f32) - 2.0_f32*Complex::i() );
+        assert!( fft_subroutines::single_dft(coeffs, 1_f32) != Complex::from(-210_f32) - 210.0_f32*Complex::i() );
     }
 
     #[test]
