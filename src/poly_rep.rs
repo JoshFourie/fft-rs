@@ -158,23 +158,39 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn single_dft(coeffs: Vec<Complex<f32>>, k:f32) -> Complex<f32>
+    pub fn de_moivre(k: f64, n: f64, N: f64) -> Complex<f64> 
+    { 
+        let pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286;        
+        return (
+            Complex::from(
+            [-2_f64, pi, k, n, 1_f64.div( N )]
+                .iter()
+                .product::<f64>()
+            ) * Complex::i()
+        ).exp()
+    
+    }
+
+    pub fn single_dft(coeffs: &Vec<Complex<f64>>, k:f64) -> Complex<f64>
     {
-        let mut sum: Vec<Complex<f32>> = Vec::new();
+        let mut sum: Vec<Complex<f64>> = Vec::new();
         for n in 0..coeffs.len() as usize
         {
-            sum.push((
-                Complex::from(
-                    [-2.0, 3.141592653589793, k, n as f32, 1.0.div( coeffs.len() as f32 )]
-                        .iter()
-                        .product::<f32>()
-                ) * Complex::i()
-                ).exp()
-            )
+            sum.push( de_moivre( k, n as f64, coeffs.len() as f64 ))
         }
-        sum.iter().zip(coeffs).map( |(x, ohm)| x * ohm ).sum()
+        sum.iter()
+            .zip(coeffs)
+            .map( |(x, ohm)| x * ohm )
+            .sum()
     }
-    pub fn seq_dft(coeffs: Vec<Complex<f32>>) {}
+
+    pub fn seq_dft(coeffs: &Vec<Complex<f64>>) -> Vec<Complex<f64>> 
+    {
+        coeffs.iter()
+            .enumerate()
+            .map(|(k, _)| single_dft( coeffs, k as f64 ))
+            .collect::<Vec<_>>()
+    }
 }
 
 
@@ -182,27 +198,51 @@ pub mod fft_subroutines {
 mod test {
     use crate::poly_rep::{*, fft_subroutines};
     use zksnark::{field::z251::Z251};
-    use num::Complex;
+    use num::{Num, Complex, Float};
 
-    pub trait RoundTo { fn round_to(self, x: Self) -> Self; }
+    pub trait RoundTo<T> { fn round_to(self, x: T) -> Self; }
 
-    impl RoundTo for f32 { fn round_to(self, x: Self) -> Self { (self * x).round()/x } }
-
-    #[test]
-    fn de_moivre_dft() {
-        let coeffs = vec![ Complex::from(1_f32), Complex::from(2_f32) - Complex::i(), -Complex::i(), -Complex::from(1_f32) + 2_f32 * Complex::i()];
-        assert!( fft_subroutines::single_dft(coeffs.clone(), 1_f32) == Complex::from(-2_f32) - 2.0_f32*Complex::i() );
-        assert!( fft_subroutines::single_dft(coeffs, 1_f32) != Complex::from(-210_f32) - 210.0_f32*Complex::i() );
+    impl<T> RoundTo<T> for Complex<T> 
+    where
+        T: Mul + Clone + Num + Float
+    { 
+        fn round_to(self, x: T) -> Self 
+        { 
+            Complex::new(
+                (self.re * x).round()/x,
+                (self.im * x).round()/x, 
+            )
+        } 
     }
 
     #[test]
-    fn check_pow_fft() {
+    fn single_dft_test() {
+        let coeffs = vec![ Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i() ];
+        let expected_output = Complex::from(-2_f64) - 2.0_f64*Complex::i();
+        let dummy_output = Complex::from(-210_f64) - 210.0_f64*Complex::i();
+        let fft_vec = fft_subroutines::single_dft(&coeffs, 1_f64).round_to(10_f64);
+        assert_eq!(&fft_vec,  &expected_output);
+        assert!(&fft_vec !=  &dummy_output);
+    }
+
+    #[test]
+    fn seq_dft_test() {
+        let coeffs = vec![Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i()];
+        let expected_output = vec![Complex::from(2_f64), Complex::from(-2_f64) - 2_f64*Complex::i(), -2_f64*Complex::i(), Complex::from(4_f64) + 4_f64*Complex::i()];
+        let dummy_output = vec![Complex::from(1_f64), Complex::from(-1_f64) - 2_f64*Complex::i(), -3_f64*Complex::i(), Complex::from(1_f64) + 4_f64*Complex::i()];
+        let fft_vec = fft_subroutines::seq_dft(&coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>(); 
+        assert_eq!(&fft_vec,  &expected_output);
+        assert!(&fft_vec !=  &dummy_output);
+    }
+
+    #[test]
+    fn check_pow_test() {
         assert!(fft_subroutines::check_pow( Z251::from(8) ));
         assert!(!fft_subroutines::check_pow( Z251::from(5) ));
     }
 
     #[test]
-    fn filter_fft() {
+    fn filter_test() {
         let (Ax, Bx) = fft_subroutines::filter( vec![1, 2, 3, 4] );
         assert_eq!(Ax, vec![1, 3]);
         assert_eq!(Bx, vec![2, 4]); 
@@ -211,7 +251,7 @@ mod test {
     }
     
     #[test]
-    fn pointwise_addition() {
+    fn pointwise_addition_test() {
         let Ax = PointWise::from( vec![ (0,1), (1,0), (2,5), (3,22) ]);
         let Bx = PointWise::from( vec![ (0,1), (1,3), (2,13), (3,37) ]);
         let Cx = PointWise::from( vec![ (0,2), (1,3), (2,18), (3,59) ]);
@@ -220,7 +260,7 @@ mod test {
     }
 
     #[test]
-    fn pointwise_subtraction() {
+    fn pointwise_subtraction_test() {
         let Ax = PointWise::from( vec![ (0,1), (1,0), (2,-5), (3,22) ]);
         let Bx = PointWise::from( vec![ (0,-1), (1,-3), (2,13), (3,37) ]);
         let Cx = PointWise::from( vec![ (0,0), (1,-3), (2,8), (3,59) ]);
@@ -229,7 +269,7 @@ mod test {
     }
 
     #[test]
-    fn pointwise_multiplication() {
+    fn pointwise_multiplication_test() {
         let Ax = PointWise::from( vec![ (-3,17), (-2,-3), (-1,1), (0,1), (1,0), (2,5), (3,22) ]);
         let Bx = PointWise::from( vec![ (-3,20), (-2,-3), (-1,2), (0,1), (1,3), (2,13), (3,37) ]);
         let Cx = PointWise::from( vec![ (-3,340), (-2,9), (-1,2), (0,1), (1,0), (2,65), (3,814) ]);
