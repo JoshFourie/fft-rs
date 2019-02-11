@@ -193,14 +193,22 @@ pub mod fft_subroutines {
     }
 
     // http://mathworld.wolfram.com/Danielson-LanczosLemma.html for separating Even/Odd
-    pub fn danielson_lanczos(coeffs: &Vec<Complex<f64>>, n: f64, k: f64, N: f64)
-    {
-        
+    // taking N from the filtered coeffs implies N/2. 
+    pub fn danielson_lanczos(e: &Vec<Complex<f64>>, o: &Vec<Complex<f64>>, k: f64) -> Complex<f64>
+    {   
+        single_dft(&e, 2.0*k)+( de_moivre(k, 1.0, (o.len()*2) as f64) * single_dft(&o, 2.0*k+1.0) )
     }
 
-    pub fn butterfly_radix_two(mut coeffs: Vec<Complex<f64>>) // -> Vec<Complex<f64>>
+    pub fn butterfly_radix_two(mut coeffs: Vec<Complex<f64>>) -> Vec<Complex<f64>>
     {
-        
+        let N=coeffs.len();
+        let (e,o)=filter(coeffs);
+        let mut fft_series=Vec::new();
+        for k in 0..N
+        {
+            fft_series.push( danielson_lanczos(&e, &o, k as f64) )
+        }
+        fft_series
     }
 }
 
@@ -228,15 +236,13 @@ mod test {
     }
 
     #[test]
-    fn butterfly_test() {
-        let coeffs = vec![Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i()];
+    fn butterfly_radix_two() {
+        let mut coeffs = vec![ Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i() ];
         let expected_output = vec![Complex::from(2_f64), Complex::from(-2_f64) - 2_f64*Complex::i(), -2_f64*Complex::i(), Complex::from(4_f64) + 4_f64*Complex::i()];
-        let dummy_output = vec![Complex::from(1_f64), Complex::from(-1_f64) - 2_f64*Complex::i(), -3_f64*Complex::i(), Complex::from(1_f64) + 4_f64*Complex::i()];
-        let fft_vec = fft_subroutines::butterfly_radix_two(coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>(); 
-
-        assert_eq!(&fft_vec,  &expected_output);
-        assert!(&fft_vec !=  &dummy_output);
+       
+        assert_eq!(fft_subroutines::butterfly_radix_two(coeffs).iter().map(|e| e.round_to(10_f64)).collect::<Vec<_>>(), expected_output);
     }
+
 
     #[test]
     fn single_dft_test() {
