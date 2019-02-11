@@ -191,7 +191,21 @@ pub mod fft_subroutines {
             .map(|(k, _)| single_dft( coeffs, k as f64 ))
             .collect::<Vec<_>>()
     }
+
+    pub fn butterfly_radix_two(coeffs: Vec<Complex<f64>>) -> Vec<Complex<f64>>
+    {
+        let N=coeffs.len(); // assert!( check_pow(N) );
+        let (ax, bx)=filter(coeffs.clone());
+        let mut fft_res: Vec<Complex<f64>>=Vec::new();
+        for i in 0..N/2
+        {
+            fft_res.push( ax[i] + de_moivre(i as f64, i as f64, bx.len() as f64 ) );
+            fft_res.push( ax[i] - de_moivre(i as f64, i as f64, bx.len() as f64 ) );          
+        }
+        fft_res
+    }
 }
+
 
 
 #[cfg(test)]
@@ -216,10 +230,22 @@ mod test {
     }
 
     #[test]
+    fn butterfly_test() {
+        let coeffs = vec![Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i()];
+        let expected_output = vec![Complex::from(2_f64), Complex::from(-2_f64) - 2_f64*Complex::i(), -2_f64*Complex::i(), Complex::from(4_f64) + 4_f64*Complex::i()];
+        let dummy_output = vec![Complex::from(1_f64), Complex::from(-1_f64) - 2_f64*Complex::i(), -3_f64*Complex::i(), Complex::from(1_f64) + 4_f64*Complex::i()];
+        let fft_vec = fft_subroutines::butterfly_radix_two(coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>(); 
+
+        assert_eq!(&fft_vec,  &expected_output);
+        assert!(&fft_vec !=  &dummy_output);
+    }
+
+    #[test]
     fn single_dft_test() {
         let coeffs = vec![ Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i() ];
         let expected_output = Complex::from(-2_f64) - 2.0_f64*Complex::i();
         let dummy_output = Complex::from(-210_f64) - 210.0_f64*Complex::i();
+
         let fft_vec = fft_subroutines::single_dft(&coeffs, 1_f64).round_to(10_f64);
         assert_eq!(&fft_vec,  &expected_output);
         assert!(&fft_vec !=  &dummy_output);
@@ -231,6 +257,7 @@ mod test {
         let expected_output = vec![Complex::from(2_f64), Complex::from(-2_f64) - 2_f64*Complex::i(), -2_f64*Complex::i(), Complex::from(4_f64) + 4_f64*Complex::i()];
         let dummy_output = vec![Complex::from(1_f64), Complex::from(-1_f64) - 2_f64*Complex::i(), -3_f64*Complex::i(), Complex::from(1_f64) + 4_f64*Complex::i()];
         let fft_vec = fft_subroutines::seq_dft(&coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>(); 
+
         assert_eq!(&fft_vec,  &expected_output);
         assert!(&fft_vec !=  &dummy_output);
     }
@@ -244,6 +271,7 @@ mod test {
     #[test]
     fn filter_test() {
         let (Ax, Bx) = fft_subroutines::filter( vec![1, 2, 3, 4] );
+        
         assert_eq!(Ax, vec![1, 3]);
         assert_eq!(Bx, vec![2, 4]); 
         assert!(Ax != vec![2, 4]);
@@ -255,6 +283,7 @@ mod test {
         let Ax = PointWise::from( vec![ (0,1), (1,0), (2,5), (3,22) ]);
         let Bx = PointWise::from( vec![ (0,1), (1,3), (2,13), (3,37) ]);
         let Cx = PointWise::from( vec![ (0,2), (1,3), (2,18), (3,59) ]);
+
         assert_eq!(true, Ax.clone() + Bx == Cx);
         assert_eq!(false, Ax.clone() + Ax.clone() == Cx)
     }
