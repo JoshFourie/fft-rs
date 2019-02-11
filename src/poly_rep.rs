@@ -192,17 +192,15 @@ pub mod fft_subroutines {
             .collect::<Vec<_>>()
     }
 
-    pub fn butterfly_radix_two(coeffs: Vec<Complex<f64>>) -> Vec<Complex<f64>>
+    // http://mathworld.wolfram.com/Danielson-LanczosLemma.html for separating Even/Odd
+    pub fn danielson_lanczos(coeffs: &Vec<Complex<f64>>, n: f64, k: f64, N: f64)
     {
-        let N=coeffs.len(); // assert!( check_pow(N) );
-        let (ax, bx)=filter(coeffs.clone());
-        let mut fft_res: Vec<Complex<f64>>=Vec::new();
-        for i in 0..N/2
-        {
-            fft_res.push( ax[i] + de_moivre(i as f64, i as f64, bx.len() as f64 ) );
-            fft_res.push( ax[i] - de_moivre(i as f64, i as f64, bx.len() as f64 ) );          
-        }
-        fft_res
+        
+    }
+
+    pub fn butterfly_radix_two(mut coeffs: Vec<Complex<f64>>) // -> Vec<Complex<f64>>
+    {
+        
     }
 }
 
