@@ -198,21 +198,30 @@ pub mod fft_subroutines {
     {   
         assert_eq!(e.len(), o.len());
         let N=e.len()+o.len();
-        let mut sum: Vec<Complex<f64>> = Vec::new();
-        for n in 0..N
+        let mut sum = Vec::new();
+        let mut sum_e: Vec<Complex<f64>> = Vec::new();
+        let mut sum_o: Vec<Complex<f64>> = Vec::new();
+        for n in 0..N.div(2)
         {
-            sum.append(
-                &mut e.iter()
-                    .map(|coeff| coeff * 2.0 * de_moivre( (2.0*k) as f64, n as f64, N as f64 ))
+            sum_e.push(
+                e.into_iter()
+                    .map(|coeff| coeff * de_moivre( k as f64, n as f64, N.div(2) as f64 ))
                     .collect::<Vec<_>>()
+                    .iter()
+                    .sum()
             );
-            sum.append(
-                &mut o.iter()
-                    .map(|coeff| coeff * (2.0*k+1.0) * de_moivre( (2.0*k+1.0) as f64, n as f64, N as f64 ))
+            sum_o.push(
+                o.into_iter()
+                    .map(|coeff| de_moivre(k as f64, n as f64, N as f64) * coeff * de_moivre( k as f64, n as f64, N.div(2) as f64 ))
                     .collect::<Vec<_>>()
+                    .iter()
+                    .sum()
             );
         }
-        sum.iter().sum()
+        sum.append(&mut sum_e);
+        sum.append(&mut sum_o);
+        sum.iter()
+            .sum()
     }
 
     pub fn butterfly_radix_two(coeffs: Vec<Complex<f64>>) -> Vec<Complex<f64>>
