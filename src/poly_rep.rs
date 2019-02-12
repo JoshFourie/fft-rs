@@ -193,47 +193,11 @@ pub mod fft_subroutines {
     }
 
     // http://mathworld.wolfram.com/Danielson-LanczosLemma.html for separating Even/Odd
-    // taking N from the filtered coeffs implies N/2. 
-    pub fn danielson_lanczos(e: &Vec<Complex<f64>>, o: &Vec<Complex<f64>>, k: f64) -> Complex<f64>
+    pub fn two_input_butterfly(e: Complex<f64>, o: Complex<f64>) -> Vec<Complex<f64>>
     {   
-        assert_eq!(e.len(), o.len());
-        let N=e.len()+o.len();
-        let mut sum = Vec::new();
-        let mut sum_e: Vec<Complex<f64>> = Vec::new();
-        let mut sum_o: Vec<Complex<f64>> = Vec::new();
-        for n in 0..N.div(2)
-        {
-            sum_e.push(
-                e.into_iter()
-                    .map(|coeff| coeff * de_moivre( k as f64, n as f64, N.div(2) as f64 ))
-                    .collect::<Vec<_>>()
-                    .iter()
-                    .sum()
-            );
-            sum_o.push(
-                o.into_iter()
-                    .map(|coeff| de_moivre(k as f64, n as f64, N as f64) * coeff * de_moivre( k as f64, n as f64, N.div(2) as f64 ))
-                    .collect::<Vec<_>>()
-                    .iter()
-                    .sum()
-            );
-        }
-        sum.append(&mut sum_e);
-        sum.append(&mut sum_o);
-        sum.iter()
-            .sum()
-    }
-
-    pub fn butterfly_radix_two(coeffs: Vec<Complex<f64>>) -> Vec<Complex<f64>>
-    {
-        let N=coeffs.len();
-        let (e,o)=filter(coeffs);
-        let mut fft_series=Vec::new();
-        for k in 0..N
-        {
-            fft_series.push( danielson_lanczos(&e, &o, k as f64) );
-        }
-        fft_series
+        let f0 = e + o;
+        let f1 = e - o;
+        vec![f0, f1]        
     }
 }
 
@@ -260,13 +224,14 @@ mod test {
     }
 
     #[test]
-    fn butterfly_radix_two() {
-        let coeffs = vec![ Complex::from(1_f64), Complex::from(2_f64) - Complex::i(), -Complex::i(), -Complex::from(1_f64) + 2_f64 * Complex::i() ];
-        let expected_output = vec![Complex::from(2_f64), Complex::from(-2_f64) - 2_f64*Complex::i(), -2_f64*Complex::i(), Complex::from(4_f64) + 4_f64*Complex::i()];
-       
-        assert_eq!(fft_subroutines::butterfly_radix_two(coeffs).iter().map(|e| e.round_to(10_f64)).collect::<Vec<_>>(), expected_output);
+    fn butterfly() {
+        let coeffs = vec![ Complex::from(15_f64), Complex::from(24_f64) - Complex::i()];
+        let expected = fft_subroutines::seq_dft(&coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>();
+        let dummy =  fft_subroutines::seq_dft(&vec![Complex::from(1224_f64), Complex::from(188_f64) - Complex::i()]).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>();
+        let test = fft_subroutines::two_input_butterfly(coeffs[0], coeffs[1]);
+        assert_eq!(test, expected);
+        assert!(test != dummy);
     }
-
 
     #[test]
     fn single_dft_test() {
