@@ -1,16 +1,23 @@
-use num::{ Complex, Num };
+use num::{ Complex, Num, ToPrimitive };
 use std::ops::{ Div };
 
 /*************************************************** Structures ****************************************/
 
 #[derive(Debug, PartialEq, Clone)] pub struct PointWise<F> { seq: Vec<Complex<F>> }
 
-#[derive(Debug, PartialEq)] pub struct DecimationNode<F> { pair: [Complex<F>; 2] }
-
-#[derive(Debug, PartialEq)] pub struct DecimationTree<F> 
+#[derive(Debug, PartialEq)] 
+pub struct DecimationNode 
 { 
-    root: Vec<F>, 
-    nodes: Vec<DecimationNode<F>>, 
+    pair: [Complex<f64>; 2], 
+    counter: usize, 
+    stage: usize, 
+}
+
+#[derive(Debug, PartialEq)] 
+pub struct DecimationTree 
+{ 
+    root: Vec<f64>, 
+    nodes: Vec<DecimationNode>, 
 }
 
 /*********************************************** Implementations **************************************/
@@ -23,44 +30,60 @@ impl<F> From<Vec<F>> for PointWise<F> where F: Clone + Num
     }
 }
 
-impl<F> DecimationNode<F>
+impl DecimationNode
 {
-    pub fn new(lhs: Complex<F>, rhs: Complex<F>) -> Self { Self{ pair: [lhs, rhs] } }
+    pub fn new(lhs: Complex<f64>, rhs: Complex<f64>, counter: usize, stage: usize) -> Self { Self{ pair: [lhs, rhs], counter, stage } }
 
-    pub fn concat(&self, rhs: &Self) // -> Self
+    pub fn concatenate(&self, other: &Self) -> Self
     {
-        
+        assert!(&self.stage == &other.stage);
+        assert!(&self.counter == &(other.counter-2));
+        let big_n=(2 as usize).pow(self.stage as u32);
+        let small_n=self.counter.div(2);
+        let (lhs_0, lhs_1)=butterfly( 
+            self.pair[0].re, 
+            self.pair[1].re, 
+            small_n, 
+            big_n
+        );
+        let (rhs_0, rhs_1)=butterfly(
+            other.pair[0].to_f64().unwrap(), 
+            other.pair[1].to_f64().unwrap(), 
+            small_n, 
+            big_n 
+        );
+        let lhs=lhs_0+lhs_1;    
+        let rhs=rhs_0+rhs_1;
+        Self::new(lhs, rhs, self.counter, &self.stage+1 )
     }
 }
 
-impl<F: Copy + Clone> DecimationTree<F>
-where
-    for <'f> f64: From<&'f F>,
-    for <'f> Complex<F>: From<&'f F>
+impl DecimationTree
 {
-    pub fn new_with_root(root: Vec<F>) -> Self { Self { root, nodes: Vec::new() } }
+    pub fn new_with_root(root: Vec<f64>) -> Self { Self { root, nodes: Vec::new() } }
 
-    pub fn init(mut self, bits: usize ) 
+    pub fn init(mut self, bits: usize ) -> Self
     {
-        let mut root=self.root;
-        danielson_lanczos_pattern(&mut root, bits);
-        for (i, lhs) in root.iter().enumerate().step_by(2) 
+        danielson_lanczos_pattern(&mut self.root, bits);
+        for (i, lhs) in self.root.iter().enumerate().step_by(2) 
         {
-            let rhs=Complex::from( &root[i+1] );
-            let node=DecimationNode::new( Complex::from(lhs), rhs );
+            let rhs=&self.root[i+1];
+            let init_stage = 1;
+            let node=DecimationNode::new( Complex::from(lhs), Complex::from(rhs), i, init_stage );
             self.nodes.push(node);
-        }             
+        }
+        self             
     }
+
+    // pub fn grow
 }
 
 /*************************************************** Functions ****************************************/
 
-fn butterfly(x0: f64, x1: f64, n: usize, N: usize) -> (Complex<f64>, Complex<f64>)
+fn butterfly(lhs: f64, rhs: f64, n: usize, N: usize) -> (Complex<f64>, Complex<f64>)
 {
-    let ohm=x1*twiddle(n, N);
-    let f0= x0 + ohm;
-    let f1= x0 - ohm;
-    (f0, f1)
+    let ohm=rhs*twiddle(n, N);
+    (lhs + ohm, lhs - ohm)
 }
 
 fn twiddle(n: usize, N: usize) -> Complex<f64>
@@ -68,7 +91,7 @@ fn twiddle(n: usize, N: usize) -> Complex<f64>
     let pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286;        
     return (
         Complex::from(
-        [-2_f64, pi, n as f64, 1_f64.div( N as f64)]
+        [-2.0, pi, n as f64, 1.0.div( N as f64)]
             .iter()
             .product::<f64>()
         ) * Complex::i()
@@ -136,7 +159,7 @@ mod tests
         let expected_8_input = vec![0, 4, 2, 6, 1, 5, 3, 7];
         let dummy_8_input = vec![0, 4, 2, 6, 1, 5, 3, 8];
 
-        // check that positions are swapped.
+        // check that positions not vals are swapped.
         let mut target_4_input = vec![0, 134, 275, 319];
         let expected_4_input = vec![0, 275, 134, 319];
         let dummy_4_input = vec![3, 1, 2, 0];
@@ -148,5 +171,24 @@ mod tests
         assert_eq!( &target_4_input , &expected_4_input );
         assert!( &target_8_input != &dummy_8_input );
         assert!( &target_4_input != &dummy_4_input );
+    }
+
+    #[test]
+    fn test_decimation_tree()
+    {
+        let root: Vec<f64> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let tree=DecimationTree::new_with_root(root).init(3);
+       
+        // todo: change to assert_eq!
+        println!("{:?}", tree);
+    }
+
+    #[test]
+    fn test_decimation_node_concatenation()
+    {
+        let root: Vec<f64> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let tree=DecimationTree::new_with_root(root).init(3);
+        let concat=&tree.nodes[2].concatenate(&tree.nodes[3]);
+        println!( "{:?}",  concat);
     }
 }
