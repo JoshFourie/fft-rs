@@ -158,12 +158,23 @@ pub mod fft_subroutines {
         n&(n-T::one()) == T::zero()
     }
 
-    pub fn de_moivre(k: f64, n: f64, N: f64) -> Complex<f64> 
+    pub fn bit_reverse(mut n: usize, l: usize) -> usize
+    {
+        let mut r=0;
+        for _ in 0..l
+        {
+            r = (r << 1) | (n & 1);
+            n >>= 1;
+        } 
+        r
+    }
+
+    pub fn de_moivre(element_deg: f64, iter_deg: f64, deg_bound: f64) -> Complex<f64> 
     { 
         let pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286;        
         return (
             Complex::from(
-            [-2_f64, pi, k, n, 1_f64.div( N )]
+            [-2_f64, pi, element_deg, iter_deg, 1_f64.div( deg_bound )]
                 .iter()
                 .product::<f64>()
             ) * Complex::i()
@@ -171,14 +182,14 @@ pub mod fft_subroutines {
     
     }
 
-    pub fn single_dft(coeffs: &Vec<Complex<f64>>, k:f64) -> Complex<f64>
+    pub fn single_dft(coeffs: &Vec<Complex<f64>>, element_deg:f64, max_deg_divisor: f64) -> Complex<f64>
     {
-        let mut sum: Vec<Complex<f64>> = Vec::new();
+        let mut sigma: Vec<Complex<f64>> = Vec::new();
         for n in 0..coeffs.len()
         {
-            sum.push( de_moivre( k, n as f64, coeffs.len() as f64 ))
+            sigma.push( de_moivre( element_deg, n as f64, (coeffs.len() as f64).div(max_deg_divisor) ))
         }
-        sum.iter()
+        sigma.iter()
             .zip(coeffs)
             .map( |(x, ohm)| x * ohm )
             .sum()
@@ -188,17 +199,11 @@ pub mod fft_subroutines {
     {
         coeffs.iter()
             .enumerate()
-            .map(|(k, _)| single_dft( coeffs, k as f64 ))
+            .map(|(k, _)| single_dft( coeffs, k as f64, 1_f64 ))
             .collect::<Vec<_>>()
     }
 
-    // http://mathworld.wolfram.com/Danielson-LanczosLemma.html for separating Even/Odd
-    pub fn two_input_butterfly(e: Complex<f64>, o: Complex<f64>) -> Vec<Complex<f64>>
-    {   
-        let f0 = e + o;
-        let f1 = e - o;
-        vec![f0, f1]        
-    }
+
 }
 
 
@@ -224,13 +229,10 @@ mod test {
     }
 
     #[test]
-    fn butterfly() {
-        let coeffs = vec![ Complex::from(15_f64), Complex::from(24_f64) - Complex::i()];
-        let expected = fft_subroutines::seq_dft(&coeffs).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>();
-        let dummy =  fft_subroutines::seq_dft(&vec![Complex::from(1224_f64), Complex::from(188_f64) - Complex::i()]).iter().map(|c| c.round_to(10_f64)).collect::<Vec<_>>();
-        let test = fft_subroutines::two_input_butterfly(coeffs[0], coeffs[1]);
-        assert_eq!(test, expected);
-        assert!(test != dummy);
+    fn bit_reverse() 
+    {
+        assert_eq!(4, fft_subroutines::bit_reverse(1, 3));
+        assert_eq!(5, fft_subroutines::bit_reverse(5, 3));
     }
 
     #[test]
@@ -239,7 +241,7 @@ mod test {
         let expected_output = Complex::from(-2_f64) - 2.0_f64*Complex::i();
         let dummy_output = Complex::from(-210_f64) - 210.0_f64*Complex::i();
 
-        let fft_vec = fft_subroutines::single_dft(&coeffs, 1_f64).round_to(10_f64);
+        let fft_vec = fft_subroutines::single_dft(&coeffs, 1_f64, 1_f64).round_to(10_f64);
         assert_eq!(&fft_vec,  &expected_output);
         assert!(&fft_vec !=  &dummy_output);
     }
