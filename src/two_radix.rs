@@ -6,18 +6,27 @@ use std::ops::{ Div };
 #[derive(Debug, PartialEq, Clone)] pub struct PointWise<F> { seq: Vec<Complex<F>> }
 
 #[derive(Debug, PartialEq)] 
-pub struct DecimationNode 
+pub struct DecimationNode
 { 
-    pair: [Complex<f64>; 2], 
-    counter: usize, 
-    stage: usize, 
+    element: Complex<f64>,
+    index: usize, 
+    stage: usize,
+    twiddle: bool, 
+}
+
+#[derive(Debug, PartialEq)]
+pub struct DecimationLeaf
+{ 
+    lhs: Vec<DecimationNode>, 
+    rhs: Vec<DecimationNode>, 
+    stage: usize 
 }
 
 #[derive(Debug, PartialEq)] 
-pub struct DecimationTree 
+pub struct DecimationTree
 { 
     root: Vec<f64>, 
-    nodes: Vec<DecimationNode>, 
+    leaves: Vec<DecimationLeaf>, 
 }
 
 /*********************************************** Implementations **************************************/
@@ -30,53 +39,101 @@ impl<F> From<Vec<F>> for PointWise<F> where F: Clone + Num
     }
 }
 
+impl DecimationLeaf
+{
+    pub fn new(lhs: Vec<DecimationNode>, rhs: Vec<DecimationNode>) -> Self { Self{ lhs, rhs, stage: 1 } }
+
+    pub fn new_empty() -> Self { Self { lhs: Vec::new(), rhs: Vec::new(), stage: 1 } }
+
+    // takes two leaves and builds them into a single parent leaf.
+    // concatenating assigns the stage to the nodes, and indexes them correctly.
+    pub fn generate_parent(mut self, mut other: Self) -> Self
+    {
+        assert!(self.stage == other.stage);
+        assert!(self.lhs.len() == self.rhs.len());
+        assert!(self.lhs.len() == other.lhs.len());
+        assert!(self.rhs.len() == other.rhs.len());
+
+        self.lhs.append(&mut self.rhs);
+        other.lhs.append(&mut self.rhs);
+
+        let mut parent=Self::new_empty();
+        parent.stage=self.stage+1;
+        parent.lhs=self.lhs.into_iter()
+            .enumerate()
+            .map(|(i, mut node)|
+            {
+                node.stage=parent.stage;
+                node.twiddle=false;
+                node.index=i;
+                node
+            }).collect::<Vec<_>>();
+        parent.rhs=other.lhs.into_iter()
+            .enumerate()
+            .map(|(i, mut node)| 
+            {
+                node.stage=parent.stage;
+                node.twiddle=false;
+                node.index=i;
+                node
+            }).collect::<Vec<_>>();        
+        parent
+    }
+}
+
 impl DecimationNode
 {
-    pub fn new(lhs: Complex<f64>, rhs: Complex<f64>, counter: usize, stage: usize) -> Self { Self{ pair: [lhs, rhs], counter, stage } }
+    pub fn new(element: Complex<f64>) -> Self { Self{ element, index: 0, stage: 1, twiddle: false } }
 
-    pub fn concatenate(&self, other: &Self) -> Self
+    // takes two decimation nodes and returns two that have been correctly twiddled.
+    pub fn map_butterflies(mut self, mut other: Self) -> (Self, Self) 
     {
-        assert!(&self.stage == &other.stage);
-        assert!(&self.counter == &(other.counter-2));
+        assert!(self.stage == other.stage);
+        assert!(!self.twiddle, other.twiddle);
+
         let big_n=(2 as usize).pow(self.stage as u32);
-        let small_n=self.counter.div(2);
-        let (lhs_0, lhs_1)=butterfly( 
-            self.pair[0].re, 
-            self.pair[1].re, 
+        let small_n=self.index;
+        let (lhs, rhs)=butterfly( 
+            self.element.to_f64()
+                .unwrap(), 
+            other.element.to_f64()
+                .unwrap(), 
             small_n, 
             big_n
         );
-        let (rhs_0, rhs_1)=butterfly(
-            other.pair[0].to_f64().unwrap(), 
-            other.pair[1].to_f64().unwrap(), 
-            small_n, 
-            big_n 
-        );
-        let lhs=lhs_0+lhs_1;    
-        let rhs=rhs_0+rhs_1;
-        Self::new(lhs, rhs, self.counter, &self.stage+1 )
+        self.element=lhs;
+        other.element=rhs;
+        (self, other)
     }
 }
 
 impl DecimationTree
 {
-    pub fn new_with_root(root: Vec<f64>) -> Self { Self { root, nodes: Vec::new() } }
+    pub fn new_with_root(root: Vec<f64>) -> Self { Self { root, leaves: Vec::new() } }
 
     pub fn init(mut self, bits: usize ) -> Self
     {
         danielson_lanczos_pattern(&mut self.root, bits);
-        for (i, lhs) in self.root.iter().enumerate().step_by(2) 
-        {
-            let rhs=&self.root[i+1];
-            let init_stage = 1;
-            let node=DecimationNode::new( Complex::from(lhs), Complex::from(rhs), i, init_stage );
-            self.nodes.push(node);
-        }
-        self             
+        self.leaves=self.root
+            .iter()
+            .enumerate()
+            .step_by(2)
+            .map(|(i, lhs)| 
+            {
+                let mut leaf=DecimationLeaf::new( Vec::new(), Vec::new() );
+                let rhs=self.root[i+1];
+                leaf.lhs.push( DecimationNode::new( Complex::from(lhs) ) );
+                leaf.rhs.push( DecimationNode::new( Complex::from(rhs) ) );
+                leaf
+            }).collect::<Vec<_>>();
+        self
     }
 
-    // pub fn grow
-}
+    pub fn process_tree(mut self) -> Vec<Complex<f64>>
+    {
+        
+    }
+} 
 
 /*************************************************** Functions ****************************************/
 
@@ -186,9 +243,11 @@ mod tests
     #[test]
     fn test_decimation_node_concatenation()
     {
-        let root: Vec<f64> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        let mut root: Vec<f64> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0];
+        danielson_lanczos_pattern(&mut root, 3);
         let tree=DecimationTree::new_with_root(root).init(3);
         let concat=&tree.nodes[2].concatenate(&tree.nodes[3]);
         println!( "{:?}",  concat);
+        println!( "{:?}", &tree.nodes);   
     }
 }
