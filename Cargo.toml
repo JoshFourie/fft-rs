@@ -5,6 +5,5 @@ authors = ["Josh Fourie <josh.fourie97@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-zksnark = {git = "https://github.com/JoshFourie/zksnark-rs"}
 num = "0.2"
 itertools = "0.8.0"
