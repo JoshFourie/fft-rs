@@ -146,7 +146,7 @@ impl DecimationTree
 
     pub fn grow(self) -> Self
     {
-        let mut tree = Self::new_empty();
+        let mut tree = Self::new_with_root(self.root);
         for (lhs, rhs) in self.leaves
             .into_iter()
             .tuples()
@@ -315,6 +315,20 @@ mod tests
         };
         assert_eq!(discrete_log(8), 3);
         assert!(discrete_log(8) != 2);
+    }
+
+    #[test]
+    fn test_concatenation()
+    {
+        let lhs_x = DecimationNode::new(Complex::from(0.0));
+        let lhs_y = DecimationNode::new(Complex::from(1.0));
+        let rhs_x = DecimationNode::new(Complex::from(2.0));
+        let rhs_y = DecimationNode::new(Complex::from(3.0));
+        let concat = DecimationLeaf::generate_parent( 
+            DecimationLeaf::new(vec![lhs_x], vec![rhs_x]), 
+            DecimationLeaf::new(vec![lhs_y], vec![rhs_y]) 
+        );
+        println!("{:?}", concat);
     }
 
     #[test]
