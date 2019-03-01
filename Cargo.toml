@@ -7,3 +7,6 @@ edition = "2018"
 [dependencies]
 num = "0.2"
 itertools = "0.8.0"
+
+[dev-dependencies]
+rustfft = "3.0.0"
