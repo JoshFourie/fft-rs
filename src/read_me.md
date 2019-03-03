@@ -1,6 +1,8 @@
 # FFT-RS: DECIMATION IN TIME w/ RECURSION TREES
-               
-34.5
+    
+Benchmark: 5.7 ns/iter
+
+More efficient on-paper implementation: https://statweb.stanford.edu/~candes/papers/ButterflyFIO.pdf.
 
 ## Preliminaries
 
