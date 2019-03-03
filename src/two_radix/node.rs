@@ -110,6 +110,16 @@ mod tests
     use itertools::Itertools;
     use crate::two_radix::{*, tests::seq_dft, leaf::DecimationLeaf, node::DecimationNode };
     use rustfft::FFTplanner;
+    use assert_approx_eq::assert_approx_eq;
+
+    fn assert_approx_vec(x: std::vec::IntoIter<Complex<f64>>, y: std::vec::IntoIter<Complex<f64>>)
+    {
+        for (exp, test) in x.zip(y)
+        {
+            assert_approx_eq!(exp.re, test.re);
+            assert_approx_eq!(exp.im, test.im);
+        }
+    }
 
     #[test]
     fn test_two_input_butterfly_map()
@@ -117,10 +127,14 @@ mod tests
         let a0 = DecimationNode::new(Complex::from(0.0), 1, 0, false);
         let a1 = DecimationNode::new(Complex::from(1.0), 1, 0, true);
         let leaf = DecimationLeaf::new(vec![a0], vec![a1], 3).transform();
-        let exp = butterfly(a0.element, a1.element, 0, 8);
+        let test = butterfly(a0.element, a1.element, 0, 8);
         let leaf_lhs = leaf.lhs[0].element;
         let leaf_rhs = leaf.rhs[0].element;
-        assert_eq!((leaf_lhs, leaf_rhs), exp);
+        assert_eq!((leaf_lhs, leaf_rhs), test);
+
+        let (x, y) = test;
+        let check = seq_dft(&vec![0.0, 1.0].into_iter().map(|n| Complex::<f64>::from(n)).collect_vec());
+        assert_approx_vec(check.into_iter(), vec![x, y].into_iter());
     }
 
     #[test]
@@ -170,8 +184,8 @@ mod tests
             .map(|x|x.round_to(1.0))
             .collect::<Vec<_>>();
         danielson_lanczos_pattern(&mut check, 2);
-        assert_eq!(test, exp);
-        // assert_eq!(exp, check);
+        assert_approx_vec(test.clone().into_iter(), exp.into_iter());
+        assert_approx_vec(test.into_iter(), check.into_iter());
     }
 
     #[test]
@@ -201,7 +215,6 @@ mod tests
         // a0 is equivalent in both & a5 is equivalent  
         assert_eq!(&stg1_a0, &leaf_stg1_even_lhs.lhs[0].element);
         assert_eq!(&stg1_a5, &leaf_stg1_odd_lhs.rhs[0].element);
-        assert!(&stg1_a3 != &leaf_stg1_odd_lhs.rhs[0].element);
 
         // twiddle only the rhs branch.
         assert_eq!(&true, &leaf_stg1_odd_lhs.rhs[0].twiddle);
@@ -256,7 +269,6 @@ mod tests
             
             assert_eq!(&lhs.element, lhs_num);
             assert_eq!(&rhs.element, rhs_num);
-            assert!(lhs_num != rhs_num);
 
             assert_eq!(rhs.twiddle, true);
             assert_eq!(lhs.twiddle, false);
@@ -289,27 +301,35 @@ mod tests
             assert_eq!(lhs.twiddle, false);
         }
         /* Test */
-        let exp = vec![stg3_a0, stg3_a1, stg3_a2, stg3_a3, stg3_a4, stg3_a5, stg3_a6, stg3_a7].into_iter()
-            .map(|x|x.round_to(1.0))
-            .collect::<Vec<_>>();
-        let mut test = leaf_stg3.lhs.into_iter()
+        let test = leaf_stg3.lhs.into_iter()
             .chain(leaf_stg3.rhs.into_iter())
-            .map(|node| node.element.round_to(1.0))
-            .collect::<Vec<_>>();   
-        danielson_lanczos_pattern(&mut test, 3);
-        assert_eq!(&exp, &test);
+            .map(|node| node.element)
+            .collect::<Vec<_>>();
 
-        let mut input: Vec<Complex<f64>> = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        // We can't assert_eq! as the numbers are trivially different around 10 sig. fig. 
+        let mut exp = vec![stg3_a0, stg3_a1, stg3_a2, stg3_a3, stg3_a4, stg3_a5, stg3_a6, stg3_a7];
+        danielson_lanczos_pattern(&mut exp, 3);
+        
+        let mut input: Vec<Complex<f64>> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
             .into_iter()
             .map_into::<Complex<f64>>()
             .collect_vec();
-        let mut output: Vec<Complex<f64>> = vec![0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let mut output: Vec<Complex<f64>> = vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
             .into_iter()
             .map_into::<Complex<f64>>()
             .collect_vec();
         let mut planner = FFTplanner::new(false);
         let fft = planner.plan_fft(8);
         fft.process(&mut input, &mut output);
-        // assert_eq!(&output, &test);
+
+        let check = seq_dft( 
+            &vec![0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0].into_iter()
+                .map(|n| Complex::from(n))
+                .collect::<Vec<_>>() 
+        );
+
+        assert_approx_vec(output.into_iter(), test.clone().into_iter());
+        assert_approx_vec(check.into_iter(), test.clone().into_iter());
+        assert_approx_vec(exp.into_iter(), test.into_iter());
     }
 }

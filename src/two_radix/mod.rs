@@ -30,7 +30,7 @@ pub fn twiddle(small_n: usize, big_n: usize) -> Complex<f64>
     let pi = std::f64::consts::PI;        
     return (
         Complex::from(
-        [2.0, pi, small_n as f64, 1.0.div( big_n as f64)]
+        [-2.0, pi, small_n as f64, 1.0.div( big_n as f64)]
             .iter()
             .product::<f64>()
         ) * Complex::i()
@@ -75,13 +75,14 @@ mod tests
     use super::*;
     use num::Complex;
     use std::ops::Div;
-    
+    use assert_approx_eq::assert_approx_eq; 
+
     pub fn de_moivre(element_deg: f64, iter_deg: f64, deg_bound: f64) -> Complex<f64> 
     { 
-        let pi = 3.141592653589793238462643383279502884197169399375105820974944592307816406286;        
+        let pi = std::f64::consts::PI;            
         return (
             Complex::from(
-            [2_f64, pi, element_deg, iter_deg, 1_f64.div( deg_bound )]
+            [-2_f64, pi, element_deg, iter_deg, 1_f64.div( deg_bound )]
                 .iter()
                 .product::<f64>()
             ) * Complex::i()
@@ -113,43 +114,54 @@ mod tests
     #[test]
     fn test_twiddle()
     {
-        let exp_x: Complex<f64> = -Complex::i();
-        let test_x: Complex<f64> = twiddle(6, 8).round_to(1.0);
-        assert_eq!(exp_x, test_x);
-        
-        let exp_y: Complex<f64> = Complex::new(-1_f64.div(2.0.sqrt()), -1_f64.div( 2.0.sqrt() )).round_to(1.0);
-        let test_y: Complex<f64> = twiddle(5, 8).round_to(1.0);
-        assert_eq!(exp_y, test_y);
+        let exp_x: Complex<f64> = Complex::i();
+        let test_x: Complex<f64> = twiddle(6, 8);
+        assert_approx_eq!(exp_x.re, test_x.re);
+        assert_approx_eq!(exp_x.im, test_x.im);
 
-        let exp_z: Complex<f64> = Complex::new(-1_f64.div(2.0.sqrt()), 1_f64.div( 2.0.sqrt() )).round_to(1.0);
-        let test_z: Complex<f64> = twiddle(3, 8).round_to(1.0);
-        assert_eq!(exp_z, test_z);
+        let exp_y: Complex<f64> = Complex::new(-1_f64.div(2.0.sqrt()), 1_f64.div( 2.0.sqrt() ));
+        let test_y: Complex<f64> = twiddle(5, 8);
+        assert_approx_eq!(exp_y.re, test_y.re);
+        assert_approx_eq!(exp_y.im, test_y.im);
 
-        let dummy: Complex<f64> = Complex::new(5_f64.div(2.0.sqrt()), -1_f64.div( 2.0.sqrt() )).round_to(1.0);
-        let test_dummy: Complex<f64> = twiddle(3, 8).round_to(1.0);
+        let exp_z: Complex<f64> = Complex::new(-1_f64.div(2.0.sqrt()), -1_f64.div( 2.0.sqrt() ));
+        let test_z: Complex<f64> = twiddle(3, 8);
+        assert_approx_eq!(exp_z.re, test_z.re);
+        assert_approx_eq!(exp_z.im, test_z.im);
+
+        let dummy: Complex<f64> = Complex::new(-5_f64.div(2.0.sqrt()), 1_f64.div( 2.0.sqrt() ));
+        let test_dummy: Complex<f64> = twiddle(3, 8);
         assert!(dummy != test_dummy)        
     }
 
     #[test]
     fn test_butterfly_assumption()
     {
-        assert_eq!(twiddle(5, 8).round_to(1.0), -twiddle(1, 8).round_to(1.0));
-        assert_eq!(twiddle(2, 4).round_to(1.0), -twiddle(0, 4).round_to(1.0));
-        assert_eq!(twiddle(7, 8).round_to(1.0), -twiddle(3, 8).round_to(1.0));
+        let test_one = |x, y|
+        {
+            let twiddle_x=twiddle(x,8);
+            let twiddle_y=twiddle(y,8);
+            assert_approx_eq!(twiddle_x.re, -twiddle_y.re);
+            assert_approx_eq!(twiddle_x.im, -twiddle_y.im);
+        };
 
-        let (test_lhs, test_rhs) = butterfly(Complex::from(2.0), Complex::from(1.0), 1, 8);
-        let exp_lhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(1, 8);
-        let exp_rhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(5, 8);
+        test_one(4, 0);
+        test_one(7, 3);
 
-        assert_eq!(test_lhs.round_to(1.0), exp_lhs.round_to(1.0));
-        assert_eq!(test_rhs.round_to(1.0), exp_rhs.round_to(1.0));
+        let test_two = |x, y|
+        {
+            let (test_lhs, test_rhs) = butterfly(Complex::from(2.0), Complex::from(1.0), x, 8);
+            let exp_lhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(x, 8);
+            let exp_rhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(y, 8);
 
-        let (test_lhs, test_rhs) = butterfly(Complex::from(2.0), Complex::from(1.0), 3, 8);
-        let exp_lhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(3, 8);
-        let exp_rhs = Complex::from(2.0) + Complex::from(1.0) * twiddle(7, 8);
+            assert_approx_eq!(test_lhs.re, exp_lhs.re);
+            assert_approx_eq!(test_lhs.im, exp_lhs.im);
+            assert_approx_eq!(test_rhs.re, exp_rhs.re);
+            assert_approx_eq!(test_rhs.im, exp_rhs.im);
+        };
 
-        assert_eq!(test_lhs.round_to(1.0), exp_lhs.round_to(1.0));
-        assert_eq!(test_rhs.round_to(1.0), exp_rhs.round_to(1.0));
+        test_two(1, 5);
+        test_two(3, 7);
     }
 
     #[test]
