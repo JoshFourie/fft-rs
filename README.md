@@ -1,3 +1,7 @@
+# Repository Notice: Archived
+
+This repository is archived. It's an implementation of some kind of fast fourier transform. 
+
 # fft-rs
 Simple Fast Fourier Transform on Polynomials with overloaded operators.
 
